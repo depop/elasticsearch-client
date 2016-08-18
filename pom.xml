@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.sumologic.elasticsearch</groupId>
     <artifactId>all</artifactId>
@@ -23,7 +24,6 @@
         <url>https://github.com/SumoLogic/elasticsearch-client/tags/all-1.0.25-SNAPSHOT</url>
         <connection>https://github.com/SumoLogic/elasticsearch-client.git/tags/all-1.0.25-SNAPSHOT</connection>
     </scm>
-
     <properties>
         <scala.version.major>2.11</scala.version.major>
         <akka.version>2.3.11</akka.version>
@@ -35,8 +35,25 @@
             <version>2.2.6</version>
         </dependency>
     </dependencies>
-    <build>
+    <distributionManagement>
+        <repository>
+            <id>depop.s3.releases</id>
+            <url>s3://depop-maven-repository/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>depop.s3.snapshots</id>
+            <url>s3://depop-maven-repository/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 
+    <build>
+        <extensions>
+            <extension>
+                <groupId>org.kuali.maven.wagons</groupId>
+                <artifactId>maven-s3-wagon</artifactId>
+                <version>1.2.1</version>
+            </extension>
+        </extensions>
         <!-- plugins on by default. -->
         <plugins>
             <!-- Do the scala. -->
@@ -181,8 +198,7 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <plugin>
+            <!--<plugin
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
                 <version>1.5</version>
@@ -206,7 +222,7 @@
                     <nexusUrl>https://oss.sonatype.org</nexusUrl>
                     <keepStagingRepositoryOnCloseRuleFailure>true</keepStagingRepositoryOnCloseRuleFailure>
                 </configuration>
-            </plugin>
+            </plugin>-->
         </plugins>
     </build>
     <parent>

@@ -114,7 +114,7 @@ trait QueryDsl extends DslCommons {
     }
   }
 
-  case class Bool(queries: BoolQuery*) extends Query {
+  case class Bool(queries: BoolQuery*) extends Query with Filter {
     val _bool = "bool"
     val queryMap = queries.map(_.toJson).map(map => (map.keys.head, map(map.keys.head))).toMap
 
@@ -249,4 +249,78 @@ trait QueryDsl extends DslCommons {
     val _matchAll = "match_all"
     override def toJson: Map[String, Any] = Map(_matchAll -> Map())
   }
+
+  case class NestedQuery(path: String, scoreMode: Option[ScoreMode] = None, query: Query) extends Query {
+    val _nested = "nested"
+    val _path = "path"
+    val _scoreMode = "score_mode"
+    val _query = "query"
+
+    lazy val innerMap: Map[String, Any] = Map(
+      _path -> path,
+      _query -> query.toJson
+    ) ++ scoreMode.map(_scoreMode -> _.value)
+
+    override def toJson: Map[String, Any] = Map(
+      _nested -> innerMap
+    )
+  }
+
+  sealed trait ScoreMode {
+    def value: String
+  }
+
+  case object AvgScoreMode extends ScoreMode {
+    override def value: String = "avg"
+  }
+
+  case object MaxScoreMode extends ScoreMode {
+    override def value: String = "max"
+  }
+
+  case object SumScoreMode extends ScoreMode {
+    override def value: String = "sum"
+  }
+
+  case object NoneScoreMode extends ScoreMode {
+    override def value: String = "none"
+  }
+
+  case class MultiMatchQuery(path: String, fields: String*) extends Query {
+    val _multiMatch = "multi_match"
+    val _query = "query"
+    val _fields = "fields"
+
+    override def toJson: Map[String, Any] = Map(
+      _multiMatch -> Map(
+        _query -> path,
+        _fields -> fields.toList
+      )
+    )
+  }
+
+  case class GeoLocation(lat: Double, lon: Double) extends Query {
+    val _lat = "lat"
+    val _lon = "lon"
+
+    override def toJson: Map[String, Any] = Map(
+      _lat -> lat,
+      _lon -> lon
+    )
+  }
+
+  case class GeoDistanceFilter(distance: String, field: String, location: GeoLocation) extends Filter {
+    val _geoDistance = "geo_distance"
+    val _distance = "distance"
+
+    override def toJson: Map[String, Any] = Map(
+      _geoDistance -> Map(
+        _distance -> distance,
+        field -> location.toJson
+      )
+    )
+  }
+
+  case class FilterBool(filter: Bool) extends SingleField("filter", filter) with Filter
+
 }

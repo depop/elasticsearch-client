@@ -276,7 +276,7 @@ object RestlasticSearchClient {
     case class BucketAggregationResultBody(doc_count_error_upper_bound: Int,
                                            sum_other_doc_count: Int,
                                            buckets: List[Bucket])
-    case class Bucket(key: String, doc_count: Int)
+    case class Bucket(key: String, doc_count: Int, aggs_name: Option[BucketAggregationResultBody])
 
     case class Hits(hits: List[ElasticJsonDocument], total: Int = 0)
     case class ElasticJsonDocument(_index: String,
