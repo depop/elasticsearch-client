@@ -42,9 +42,9 @@ trait SortDsl extends DslCommons {
     override def toJson: Map[String, Any] = Map(
       _geoDistance -> Map(
         field -> location.toJson,
-      _order -> order.value,
-      _unit -> unit,
-      _distanceType -> distanceType)
+        _order -> order.value,
+        _unit -> unit,
+        _distanceType -> distanceType)
     )
   }
 

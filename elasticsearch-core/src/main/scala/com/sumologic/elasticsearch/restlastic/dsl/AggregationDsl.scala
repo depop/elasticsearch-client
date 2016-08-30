@@ -34,7 +34,7 @@ trait AggregationDsl extends DslCommons with QueryDsl {
       Map(_query -> query.toJson,
         _aggs -> aggs.toJson,
         _size -> 0) ++
-        timeout.map(t => _timeout -> s"${t}ms")
+      timeout.map(t => _timeout -> s"${t}ms")
     }
   }
 

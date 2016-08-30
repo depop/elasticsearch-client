@@ -47,7 +47,6 @@ class RestlasticSearchClientTest extends WordSpec with Matchers with ScalaFuture
   }
 
   "RestlasticSearchClient" should {
-
     "Be able to create an index and setup index setting with keyword lowercase analyzer" in {
       val analyzer = Analyzer(analyzerName, Keyword, Lowercase)
       val indexSetting = IndexSetting(12, 1, analyzer, 30)
@@ -441,7 +440,7 @@ class RestlasticSearchClientTest extends WordSpec with Matchers with ScalaFuture
       val termf1 = TermFilter("f2", "1")
       val termf2 = TermFilter("text", "text1")
       val filteredQuery = MultiTermFilteredQuery(phasePrefixQuery, termf1, termf1)
-      val termsAggr = TermsAggregation("f1", Some("aggr.*"), Some(5), Some(5), Some("map"), None, None)
+      val termsAggr = TermsAggregation("f1", Some("aggr.*"), Some(5), Some(5), Some("map"))
       val aggrQuery = AggregationQuery(filteredQuery, termsAggr, Some(1000))
 
       val expected = BucketAggregationResultBody(0, 0, List(Bucket("aggr1", 1, None), Bucket("aggr3", 1, None)))
@@ -486,6 +485,34 @@ class RestlasticSearchClientTest extends WordSpec with Matchers with ScalaFuture
       regexQueryFuture2.futureValue.sourceAsMap.toSet should be(Set(Map("f1" -> "regexFilter1", "f2" -> 1, "text" -> "text1"),  Map("f1" -> "regexFilter2", "f2" -> 1, "text" -> "text2")))
     }
 
+    "Support NestedQuery" in {
+      // https://www.elastic.co/guide/en/elasticsearch/reference/2.3/query-dsl-nested-query.html
+      val metadataMapping = Mapping(tpe, IndexMapping(Map("user" -> NestedFieldMapping), EnabledFieldMapping(true), None))
+      val mappingFuture = restClient.putMapping(index, tpe, metadataMapping)
+      whenReady(mappingFuture) { _ => refresh() }
+      val userDoc = List(Map("first" -> "john", "last" -> "Smith"), Map("first" -> "Alice", "last" -> "White"))
+      val matchDoc = Document("matchDoc", Map("user" -> userDoc))
+      val matchDocInsertionFuture = restClient.index(index, tpe, matchDoc)
+      whenReady(matchDocInsertionFuture) { _ => refresh() }
+
+      val matchResultFuture = restClient.query(index, tpe, QueryRoot(NestedQuery("user", Some(AvgScoreMode), Bool(Must(MatchQuery("user.first", "Alice"))))))
+      whenReady(matchResultFuture) { resp =>
+        resp.extractSource[DocNestedType].head should be(DocNestedType(userDoc))
+      }
+    }
+
+    "support multi match query" in {
+      // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-multi-match-query.html
+      val multiMatchDoc1 = Document("multiMatchDoc1", Map("f1" -> "multimatch1", "f2" -> 1, "text" -> "text1"))
+      val multiMatchDoc2 = Document("multiMatchDoc2", Map("f1" -> "text1", "f2" -> 1, "text" -> "multimatch1"))
+      val docsFuture = restClient.bulkIndex(index, tpe, Seq(multiMatchDoc1, multiMatchDoc2))
+      whenReady(docsFuture) { _ => refresh() }
+
+      val matchQuery = MultiMatchQuery("multimatch1", "f1", "text")
+      val matchQueryFuture = restClient.query(index, tpe, QueryRoot(matchQuery))
+      matchQueryFuture.futureValue.sourceAsMap.toSet should be(Set(Map("f1" -> "text1", "f2" -> 1, "text" -> "multimatch1"), Map("f1" -> "multimatch1", "f2" -> 1, "text" -> "text1")))
+    }
+
     "support geo distance filter" in {
       // https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-distance.html
       val geoPointMapping = BasicFieldMapping(GeoPointType, None, None)
@@ -498,7 +525,7 @@ class RestlasticSearchClientTest extends WordSpec with Matchers with ScalaFuture
       val locDocsFuture = restClient.bulkIndex(index, tpe, Seq(locationDoc1, locationDoc2))
       whenReady(locDocsFuture) { _ => refresh() }
 
-      val geoQuery =  MultiTermFilteredQuery(
+      val geoQuery = MultiTermFilteredQuery(
         query = MatchQuery("category", "categoryName"),
         filter = GeoDistanceFilter(s"1km", "location", GeoLocation(40.715, -74.011))
       )
@@ -507,6 +534,7 @@ class RestlasticSearchClientTest extends WordSpec with Matchers with ScalaFuture
     }
 
     "support simple sorting" in {
+      // https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html
       val sortDoc1 = Document("simpleSortDoc1", Map("f1" -> "simpleSort", "cat" -> "aaa"))
       val sortDoc2 = Document("simpleSortDoc2", Map("f1" -> "simpleSort", "cat" -> "aab"))
       val sortFuture = restClient.bulkIndex(index, tpe, Seq(sortDoc1, sortDoc2))
@@ -533,32 +561,39 @@ class RestlasticSearchClientTest extends WordSpec with Matchers with ScalaFuture
     }
 
     "support sorting by Distance" in {
-      val sortDoc1 = Document("simpleSortDoc1", Map("f1" -> "simpleSort", "cat" -> "aaa"))
-      val sortDoc2 = Document("simpleSortDoc2", Map("f1" -> "simpleSort", "cat" -> "aab"))
-      val sortFuture = restClient.bulkIndex(index, tpe, Seq(sortDoc1, sortDoc2))
-      whenReady(sortFuture) { ok => refresh() }
+      // https://www.elastic.co/guide/en/elasticsearch/guide/current/sorting-by-distance.html
+      val geoPointMapping = BasicFieldMapping(GeoPointType, None, None)
+      val metadataMapping = Mapping(tpe, IndexMapping(Map("location" -> geoPointMapping), EnabledFieldMapping(true), Some(false)))
+      val mappingFut = restClient.putMapping(index, tpe, metadataMapping)
+      whenReady(mappingFut) { _ => refresh() }
+      val locationDoc1 = Document("distanceSortDoc1", Map("f1" -> "distanceSortDoc", "location" -> "40.715, -74.011"))
+      val locationDoc2 = Document("distanceSortDoc2", Map("f1" -> "distanceSortDoc", "location" -> "1, 1"))
+      val locDocsFuture = restClient.bulkIndex(index, tpe, Seq(locationDoc1, locationDoc2))
+      whenReady(locDocsFuture) { _ => refresh() }
+
       val sortQueryAscFuture = restClient.query(index, tpe, new QueryRoot(
-        MatchQuery("category", "categoryName"),
+        MatchQuery("f1", "distanceSortDoc"),
         fromOpt = None,
         sizeOpt = None,
         sort = Seq(GeoDistanceSort("location", GeoLocation(40.715, -74.011), AscSortOrder, "km", "plane")),
         timeout = None,
         sourceFilter = None)
       )
-      sortQueryAscFuture.futureValue.sourceAsMap should be(Seq(Map("category" -> "categoryName", "location" -> "40.715, -74.011"), Map("category" -> "categoryName", "location" -> "1, 1")))
+      sortQueryAscFuture.futureValue.sourceAsMap should be(Seq(Map("f1" -> "distanceSortDoc", "location" -> "40.715, -74.011"), Map("f1" -> "distanceSortDoc", "location" -> "1, 1")))
 
       val sortQueryDescFuture = restClient.query(index, tpe, new QueryRoot(
-        MatchQuery("category", "categoryName"),
+        MatchQuery("f1", "distanceSortDoc"),
         fromOpt = None,
         sizeOpt = None,
         sort = Seq(GeoDistanceSort("location", GeoLocation(40.715, -74.011), DescSortOrder, "km", "plane")),
         timeout = None,
         sourceFilter = None)
       )
-      sortQueryDescFuture.futureValue.sourceAsMap should be(Seq(Map("category" -> "categoryName", "location" ->  "1, 1"), Map("category" -> "categoryName", "location" -> "40.715, -74.011")))
+      sortQueryDescFuture.futureValue.sourceAsMap should be(Seq(Map("f1" -> "distanceSortDoc", "location" ->  "1, 1"), Map("f1" -> "distanceSortDoc", "location" -> "40.715, -74.011")))
     }
   }
 }
 
+case class DocNestedType(user: List[Map[String, String]])
 
 case class DocType(f1: String, f2: Int)
