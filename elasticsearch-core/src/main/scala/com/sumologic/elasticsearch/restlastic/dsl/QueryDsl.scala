@@ -264,7 +264,7 @@ trait QueryDsl extends DslCommons with SortDsl {
     override def toJson: Map[String, Any] = Map(_matchAll -> Map())
   }
 
-  case class NestedQuery(path: String, scoreMode: Option[ScoreMode] = None, query: Bool) extends Query {
+  case class NestedQuery(path: String, scoreMode: Option[ScoreMode] = None, query: Query) extends Query {
     val _nested = "nested"
     val _path = "path"
     val _scoreMode = "score_mode"
@@ -348,4 +348,6 @@ trait QueryDsl extends DslCommons with SortDsl {
       )
     )
   }
+
+  case class FilterBool(filter: Bool) extends SingleField("filter", filter) with Filter
 }

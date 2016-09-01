@@ -43,6 +43,7 @@
         <snapshotRepository>
             <id>depop.s3.snapshots</id>
             <url>s3://depop-maven-repository/snapshots</url>
+            <uniqueVersion>false</uniqueVersion>
         </snapshotRepository>
     </distributionManagement>
 
