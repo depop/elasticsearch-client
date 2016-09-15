@@ -557,6 +557,17 @@ class RestlasticSearchClientTest extends WordSpec with Matchers with ScalaFuture
       geoQueryFuture.futureValue.sourceAsMap.toSet should be(Set(Map("category" -> "categoryName", "location" -> "40.715, -74.011")))
     }
 
+    "support bool filter" in {
+      val boolDoc1 = Document("boolDoc1", Map("f1" -> "regexFilter1", "f2" -> 1, "text" -> "text1"))
+      val boolDoc2 = Document("boolDoc1", Map("f1" -> "regexFilter2", "f2" -> 1, "text" -> "text2"))
+      val boolFuture = restClient.bulkIndex(index, tpe, Seq(boolDoc1, boolDoc2))
+      whenReady(boolFuture) { _ => refresh() }
+
+      val filteredQuery = MultiTermFilteredQuery(MatchAll, Bool(MustNot(TermQuery("text", "text2"))))
+      val boolQueryFuture = restClient.query(index, tpe, QueryRoot(filteredQuery))
+      boolQueryFuture.futureValue.sourceAsMap should be(List(Map("f1" -> "regexFilter1", "f2" -> 1, "text" -> "text1")))
+    }
+
     "support simple sorting" in {
       // https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html
       val sortDoc1 = Document("simpleSortDoc1", Map("f1" -> "simpleSort", "cat" -> "aaa"))
