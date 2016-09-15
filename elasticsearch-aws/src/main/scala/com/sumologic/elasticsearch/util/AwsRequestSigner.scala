@@ -39,9 +39,15 @@ import spray.http.HttpRequest
  */
 class AwsRequestSigner(awsCredentialsProvider: AWSCredentialsProvider, region: String, service: String) extends RequestSigner {
   val Algorithm = "AWS4-HMAC-SHA256"
-  require(Option(awsCredentialsProvider.getCredentials).isDefined, "awsCredentialsProvider must return non null awsCredentials.")
+  require(awsCredentialsProvider.getCredentials != null, "awsCredentialsProvider must return non null awsCredentials.")
 
-  def this(awsCredentials: AWSCredentials, region: String, service: String)= {
+  /**
+   * Sign AWS requests following the instructions at http://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html
+   * @param awsCredentials AWS creds to sign with
+   * @param region Region to connect to
+   * @param service Service to connect to (eg. "es" for elasticsearch) [http://docs.aws.amazon.com/general/latest/gr/rande.html]
+   */
+  def this(awsCredentials: AWSCredentials, region: String, service: String) = {
     this(new StaticCredentialsProvider(awsCredentials), region, service)
   }
 
