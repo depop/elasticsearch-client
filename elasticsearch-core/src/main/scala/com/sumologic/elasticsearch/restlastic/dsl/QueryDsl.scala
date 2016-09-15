@@ -128,7 +128,7 @@ trait QueryDsl extends DslCommons with SortDsl {
     }
   }
 
-  case class Bool(queries: BoolQuery*) extends Query {
+  case class Bool(queries: BoolQuery*) extends Query with Filter {
     val _bool = "bool"
     val queryMap = queries.map(_.toJson).map(map => (map.keys.head, map(map.keys.head))).toMap
 
